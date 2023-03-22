@@ -6,6 +6,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "sleeplock.h"
+#include "lock_consts.h"
 
 
 uint64
@@ -109,10 +110,6 @@ void init() {
     }
 }
 
-int const get_available_type = 0, 
-    release_ownership_type = 1, 
-    acquire_type = 2, 
-    release_type = 3;
 
 int check_index(int index) {
   if (index < 0 || index >= n) {
@@ -124,7 +121,7 @@ int check_index(int index) {
 
 int syslock(int request, int index) {
     acquire(&syslocks.main_lock);
-    if (request == get_available_type) {
+    if (request == LK_OPEN) {
         for (int i = 0; i < n; ++i) {
             if (syslocks.owned[i] == 0) {
                 syslocks.owned[i] = 1;
@@ -134,7 +131,7 @@ int syslock(int request, int index) {
         }
         release(&syslocks.main_lock);
         return -1;
-    } else if (request == release_ownership_type) {
+    } else if (request == LK_CLOSE) {
         if (check_index(index) == -1 || syslocks.owned[index] != 1) {
           release(&syslocks.main_lock);
           return -1;
@@ -142,7 +139,7 @@ int syslock(int request, int index) {
         syslocks.owned[index] = 0;
         release(&syslocks.main_lock);
         return 0;
-    } else if (request == acquire_type) {
+    } else if (request == LK_ACQ) {
         if (check_index(index) == -1 || syslocks.owned[index] != 1) {
           release(&syslocks.main_lock);
           return -1;
@@ -151,7 +148,7 @@ int syslock(int request, int index) {
         acquiresleep(&syslocks.sleeplocks[index]);
         return 0;
 
-    } else if (request == release_type) {
+    } else if (request == LK_REL) {
         if (check_index(index) == -1 || syslocks.owned[index] != 1) {
           release(&syslocks.main_lock);
           return -1;

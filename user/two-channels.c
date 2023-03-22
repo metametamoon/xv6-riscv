@@ -1,12 +1,7 @@
 #include "kernel/types.h"
 #include "user/user.h"
 #include "kernel/stat.h"
-
-
-int const get_available_type = 0, 
-    release_ownership_type = 1, 
-    acquire_type = 2, 
-    release_type = 3;
+#include "kernel/lock_consts.h"
 
 
 int main(int argc, char** argv) {
@@ -17,7 +12,7 @@ int main(int argc, char** argv) {
     int child_to_parent[2];
     int pipesucc = pipe(parent_to_child);
     
-    int printlock = lock(get_available_type, 0);
+    int printlock = lock(LK_OPEN, 0);
     if (printlock < 0) {
         printf("Error creating a lock.");
         exit(-1);
@@ -46,16 +41,16 @@ int main(int argc, char** argv) {
 
         char buf[1];;
         while(read(child_to_parent[0], buf, 1) == 1) {
-            lock(acquire_type, printlock);
+            lock(LK_ACQ, printlock);
             fprintf(1, "pid <%d>: received <%c>\n", getpid(), *buf);
-            lock(release_type, printlock);
+            lock(LK_REL, printlock);
         }
-        lock(acquire_type, printlock);
+        lock(LK_ACQ, printlock);
         fprintf(1, "pid <%d>: ended\n", getpid());
-        lock(release_type, printlock);
+        lock(LK_REL, printlock);
         close(child_to_parent[0]);
-        
         wait(0);
+        lock(LK_CLOSE, printlock);
         exit(0);
 
     } else {
@@ -63,16 +58,16 @@ int main(int argc, char** argv) {
         close(child_to_parent[0]);
         char* buf = malloc(1);
         while(read(parent_to_child[0], buf, 1) == 1) {
-            lock(acquire_type, printlock);
+            lock(LK_ACQ, printlock);
             
             fprintf(1, "pid <%d>: received <%c>\n", getpid(), *buf);
             write(child_to_parent[1], buf, 1);
             fprintf(1, "pid <%d>: sent <%c>\n", getpid(), *buf);
-            lock(release_type, printlock);
+            lock(LK_REL, printlock);
         }
-        lock(acquire_type, printlock);
+        lock(LK_ACQ, printlock);
         fprintf(1, "pid <%d>: ended\n", getpid());
-        lock(release_type, printlock);
+        lock(LK_REL, printlock);
         close(child_to_parent[1]);
         close(parent_to_child[0]);
         exit(0);
