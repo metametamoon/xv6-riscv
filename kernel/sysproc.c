@@ -5,6 +5,9 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "sleeplock.h"
+#include "lock_consts.h"
+
 
 uint64
 sys_exit(void)
@@ -88,4 +91,82 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+
+#define n 256
+
+struct {
+    struct spinlock main_lock;
+    short owned[n];
+    struct sleeplock sleeplocks[n];
+} syslocks;
+
+void init() {
+    initlock(&syslocks.main_lock, "main_lock");
+    for (int i = 0; i < n; ++i) {
+        syslocks.owned[i] = 0;
+        initsleeplock(&syslocks.sleeplocks[i], "sleep_lock");
+    }
+}
+
+
+int check_index(int index) {
+  if (index < 0 || index >= n) {
+    return -1;
+  } else {
+    return 0;
+  }
+}
+
+int syslock(int request, int index) {
+    acquire(&syslocks.main_lock);
+    if (request == LK_OPEN) {
+        for (int i = 0; i < n; ++i) {
+            if (syslocks.owned[i] == 0) {
+                syslocks.owned[i] = 1;
+                release(&syslocks.main_lock);
+                return i;
+            }
+        }
+        release(&syslocks.main_lock);
+        return -1;
+    } else if (request == LK_CLOSE) {
+        if (check_index(index) == -1 || syslocks.owned[index] != 1) {
+          release(&syslocks.main_lock);
+          return -1;
+        }
+        syslocks.owned[index] = 0;
+        release(&syslocks.main_lock);
+        return 0;
+    } else if (request == LK_ACQ) {
+        if (check_index(index) == -1 || syslocks.owned[index] != 1) {
+          release(&syslocks.main_lock);
+          return -1;
+        }
+        release(&syslocks.main_lock);
+        acquiresleep(&syslocks.sleeplocks[index]);
+        return 0;
+
+    } else if (request == LK_REL) {
+        if (check_index(index) == -1 || syslocks.owned[index] != 1) {
+          release(&syslocks.main_lock);
+          return -1;
+        }
+        release(&syslocks.main_lock);
+        releasesleep(&syslocks.sleeplocks[index]);
+        return 0;
+    }
+    return -1; // unknown request type
+}
+
+
+uint64 sys_lock(void) {
+  int request;
+  int index;
+
+  argint(0, &request);
+  argint(1, &index);
+
+  return syslock(request, index);
 }
