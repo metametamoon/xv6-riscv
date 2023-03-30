@@ -5,12 +5,14 @@
 
 
 int main() {
-    printf("1.\n\n");
+    printf("1.\n");
     vmprint();
-    printf("Here");
-    printf("2.\n\n");
-    vmprint();
-    printf("3.\n\n");
-    vmprint();
+    printf("2.\n");
+    pgaccess();
+    free(malloc(1000));
+    printf("3.\n");
+    pgaccess();
+    printf("3.\n");
+    pgaccess();
     return 0;
 }

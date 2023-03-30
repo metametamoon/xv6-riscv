@@ -191,27 +191,18 @@ void recursive_print_accessed(pagetable_t table, int level) {
         pte_t pte = table[i];
         pte_t* pte_ptr = &(table[i]);
         if ((pte & PTE_V) && ((level < 2) || (pte & PTE_A))) {
-            printf("%d ", level);
             for (int j = 0; j < level; ++j) {
                 printf(".. ");
             }
-            // printf("level: %d\n", level);
             printf("%d: pte %p %p\n", i, pte, PTE2PA(pte));
             if (level < 2) {
                 recursive_print_accessed((pagetable_t)PTE2PA(pte), level + 1);
             }
-            printf("\n\n");
             if (level == 2 && (pte & PTE_A)) {
-                // printf("pte ")
-                // printf("Nullified %p\n", pte);
                 (*pte_ptr) = pte & ~PTE_A;
-                // printf("in the middle\n");
                 if(((*pte_ptr) & PTE_A) != 0) {
-                    printf("just before exiting\n");
-                    
-                    exit(-5);
+                    exit(-1); // error on nullyfing the bit
                 }
-                // printf("New value is %p\n", *pte_ptr);
             }
         }
     }
@@ -221,12 +212,14 @@ uint64 sys_vmprint(void) {
     struct proc* p = myproc();
     pagetable_t pgtbl = p->pagetable;
     recursive_print(pgtbl, 0);
-    printf("\n\nAccessed:\n");
-    recursive_print_accessed(pgtbl, 0);
-    printf("\n\n\n\n");
+    printf("\n");
+    return 0;
+}
 
-    acquire(&p->lock);
-    printf("Hello from vmprint! pid:%d\n",  p->pid);
-    release(&p->lock);
+uint64 sys_pgaccess(void) {
+    struct proc* p = myproc();
+    pagetable_t pgtbl = p->pagetable;
+    recursive_print_accessed(pgtbl, 0);
+    printf("\n");
     return 0;
 }
