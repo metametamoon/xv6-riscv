@@ -170,3 +170,56 @@ uint64 sys_lock(void) {
 
   return syslock(request, index);
 }
+
+void recursive_print(pagetable_t table, int level) {
+    for (int i = 0; i < 512; ++i) {
+        pte_t pte = table[i];
+        if (pte & PTE_V) {
+            for (int j = 0; j < level; ++j) {
+                printf(".. ");
+            }
+            printf("%d: pte %p %p\n", i, pte, PTE2PA(pte));
+            if (level < 2) {
+                recursive_print((pagetable_t)PTE2PA(pte), level + 1);
+            }
+        }
+    }
+}
+
+void recursive_print_accessed(pagetable_t table, int level) {
+    for (int i = 0; i < 512; ++i) {
+        pte_t pte = table[i];
+        pte_t* pte_ptr = &(table[i]);
+        if ((pte & PTE_V) && ((level < 2) || (pte & PTE_A))) {
+            for (int j = 0; j < level; ++j) {
+                printf(".. ");
+            }
+            printf("%d: pte %p %p\n", i, pte, PTE2PA(pte));
+            if (level < 2) {
+                recursive_print_accessed((pagetable_t)PTE2PA(pte), level + 1);
+            }
+            if (level == 2 && (pte & PTE_A)) {
+                (*pte_ptr) = pte & ~PTE_A;
+                if(((*pte_ptr) & PTE_A) != 0) {
+                    exit(-1); // error on nullyfing the bit
+                }
+            }
+        }
+    }
+}
+
+uint64 sys_vmprint(void) {
+    struct proc* p = myproc();
+    pagetable_t pgtbl = p->pagetable;
+    recursive_print(pgtbl, 0);
+    printf("\n");
+    return 0;
+}
+
+uint64 sys_pgaccess(void) {
+    struct proc* p = myproc();
+    pagetable_t pgtbl = p->pagetable;
+    recursive_print_accessed(pgtbl, 0);
+    printf("\n");
+    return 0;
+}

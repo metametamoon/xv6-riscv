@@ -37,3 +37,5 @@ entry("sbrk");
 entry("sleep");
 entry("uptime");
 entry("lock");
+entry("vmprint");
+entry("pgaccess");
