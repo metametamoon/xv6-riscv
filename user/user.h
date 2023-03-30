@@ -23,6 +23,8 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int lock(int, int);
+int dmesg(void);
+
 
 // ulib.c
 int stat(const char*, struct stat*);

@@ -22,6 +22,8 @@
 #include "defs.h"
 #include "proc.h"
 
+#include "pr_msg.h"
+
 #define BACKSPACE 0x100
 #define C(x)  ((x)-'@')  // Control-x
 
@@ -189,4 +191,72 @@ consoleinit(void)
   // to consoleread and consolewrite.
   devsw[CONSOLE].read = consoleread;
   devsw[CONSOLE].write = consolewrite;
+}
+
+
+void*
+memmove(void *dst, const void *src, uint n);
+
+
+struct {
+    char buffer[MSG_BUFF_SIZE];
+    struct spinlock lock;
+    int last_pos;
+} msg_buffer;
+
+void append_char(char ch) {
+    if (msg_buffer.last_pos < MSG_BUFF_SIZE) {
+        msg_buffer.buffer[msg_buffer.last_pos] = ch;
+        msg_buffer.last_pos += 1;
+    }
+}
+
+void append_ticks() {
+    append_char(' ');
+    append_char('[');
+    uint xticks;
+    acquire(&tickslock);
+    xticks = ticks;
+    release(&tickslock);
+    uint digits_nums = 0;
+    uint pow_of_10 = 1;
+    while (pow_of_10 < xticks) {
+        digits_nums += 1;
+        pow_of_10 *= 10;
+    }
+    digits_nums -= 1;
+    pow_of_10 /= 10;
+    while (pow_of_10 > 0) {
+        char next = '0' + xticks / pow_of_10;
+        append_char(next);
+        xticks = xticks % pow_of_10;
+        pow_of_10 /= 10;
+    }
+    append_char('t');
+    append_char('k');
+    append_char('s');
+    append_char(']');
+    append_char('\n');
+}
+
+
+
+// The message will not be added if it does not fit, but the ticks count might be corrupted on the last entry
+void pr_msg(const char *str) {
+    acquire(&msg_buffer.lock);
+    int length = strlen(str);
+    if (length + msg_buffer.last_pos >= MSG_BUFF_SIZE) {
+        return;
+    }
+    memmove((char*)(msg_buffer.buffer) + msg_buffer.last_pos, str, length);
+    msg_buffer.last_pos += length;
+    append_ticks();
+    release(&msg_buffer.lock);
+}
+
+void dmesg() {
+    for (int i = 0; i < msg_buffer.last_pos; ++i) {
+        consputc(msg_buffer.buffer[i]);
+    }
+    // write(0, msg_buffer.buffer, msg_buffer.last_pos);
 }
