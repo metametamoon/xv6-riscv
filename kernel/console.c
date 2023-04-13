@@ -201,18 +201,35 @@ memmove(void *dst, const void *src, uint n);
 struct {
     char buffer[MSG_BUFF_SIZE];
     struct spinlock lock;
-    int last_pos;
+    // int last_pos
+    int head;
+    int tail;
 } msg_buffer;
 
 void append_char(char ch) {
-    if (msg_buffer.last_pos < MSG_BUFF_SIZE) {
-        msg_buffer.buffer[msg_buffer.last_pos] = ch;
-        msg_buffer.last_pos += 1;
+  msg_buffer.buffer[msg_buffer.tail] = ch;
+  msg_buffer.tail = (msg_buffer.tail + 1) % MSG_BUFF_SIZE;
+  if (msg_buffer.tail == msg_buffer.head) {
+    msg_buffer.head = (msg_buffer.head + 1) % MSG_BUFF_SIZE;
+    int itercount = 0;
+    while (msg_buffer.buffer[msg_buffer.head] != '\n' && itercount <= MSG_BUFF_SIZE) {
+      msg_buffer.head = (msg_buffer.head + 1) % MSG_BUFF_SIZE;
+      itercount += 1;
     }
+    if (itercount > MSG_BUFF_SIZE) {
+      // no newlines... push head one position forward
+      msg_buffer.head = (msg_buffer.head + 1) % MSG_BUFF_SIZE;
+    } else  { // msg_buffer.head == '\n'.
+      int new_pos = (msg_buffer.head + 1) % MSG_BUFF_SIZE;
+      if (new_pos != msg_buffer.tail) {
+        msg_buffer.head = new_pos;
+      }
+      // only one \n, right before the  tail; nothing needs to be done
+    }
+  }
 }
 
 void append_ticks() {
-    append_char(' ');
     append_char('[');
     uint xticks;
     acquire(&tickslock);
@@ -232,31 +249,109 @@ void append_ticks() {
         xticks = xticks % pow_of_10;
         pow_of_10 /= 10;
     }
+    append_char(' ');
     append_char('t');
     append_char('k');
     append_char('s');
     append_char(']');
-    append_char('\n');
+    append_char(' ');
 }
 
 
 
-// The message will not be added if it does not fit, but the ticks count might be corrupted on the last entry
-void pr_msg(const char *str) {
-    acquire(&msg_buffer.lock);
-    int length = strlen(str);
-    if (length + msg_buffer.last_pos >= MSG_BUFF_SIZE) {
-        return;
+static char digits[] = "0123456789abcdef";
+
+static void
+printintbuff(int xx, int base, int sign)
+{
+  char buf[16];
+  int i;
+  uint x;
+
+  if(sign && (sign = xx < 0))
+    x = -xx;
+  else
+    x = xx;
+
+  i = 0;
+  do {
+    buf[i++] = digits[x % base];
+  } while((x /= base) != 0);
+
+  if(sign)
+    buf[i++] = '-';
+
+  while(--i >= 0)
+    append_char(buf[i]);
+}
+
+static void
+printptrbuff(uint64 x)
+{
+  int i;
+  append_char('0');
+  append_char('x');
+  for (i = 0; i < (sizeof(uint64) * 2); i++, x <<= 4)
+    append_char(digits[x >> (sizeof(uint64) * 8 - 4)]);
+}
+
+
+
+// The message
+void pr_msg(const char *fmt, ...) {
+  va_list ap;
+  int i, c;
+  char *s;
+
+  acquire(&msg_buffer.lock);
+  append_ticks();
+
+  if (fmt == 0)
+    panic("null fmt");
+
+  va_start(ap, fmt);
+  for(i = 0; (c = fmt[i] & 0xff) != 0; i++){
+    if(c != '%'){
+      append_char(c);
+      continue;
     }
-    memmove((char*)(msg_buffer.buffer) + msg_buffer.last_pos, str, length);
-    msg_buffer.last_pos += length;
-    append_ticks();
-    release(&msg_buffer.lock);
+    c = fmt[++i] & 0xff;
+    if(c == 0)
+      break;
+    switch(c){
+    case 'd':
+      printintbuff(va_arg(ap, int), 10, 1);
+      break;
+    case 'x':
+      printintbuff(va_arg(ap, int), 16, 1);
+      break;
+    case 'p':
+      printptrbuff(va_arg(ap, uint64));
+      break;
+    case 's':
+      if((s = va_arg(ap, char*)) == 0)
+        s = "(null)";
+      for(; *s; s++)
+        append_char(*s);
+      break;
+    case '%':
+      append_char('%');
+      break;
+    default:
+      // Print unknown % sequence to draw attention.
+      append_char('%');
+      append_char(c);
+      break;
+    }
+  }
+  va_end(ap);
+  append_char('\n');
+
+  release(&msg_buffer.lock);
 }
 
 void dmesg() {
-    for (int i = 0; i < msg_buffer.last_pos; ++i) {
-        consputc(msg_buffer.buffer[i]);
-    }
-    // write(0, msg_buffer.buffer, msg_buffer.last_pos);
+  for (int i = msg_buffer.head; i != msg_buffer.tail; i = (i + 1) % MSG_BUFF_SIZE) {
+      consputc(msg_buffer.buffer[i]);
+  }
 }

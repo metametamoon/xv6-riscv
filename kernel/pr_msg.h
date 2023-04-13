@@ -1,4 +1,4 @@
-#define MSG_BUFF_SIZE 1000
+#define MSG_BUFF_SIZE 500
 
-void pr_msg(const char *str);
+void pr_msg(const char *str, ...);
 void dmesg(void);
