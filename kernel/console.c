@@ -235,19 +235,24 @@ void append_ticks() {
     acquire(&tickslock);
     xticks = ticks;
     release(&tickslock);
-    uint digits_nums = 0;
-    uint pow_of_10 = 1;
-    while (pow_of_10 < xticks) {
-        digits_nums += 1;
-        pow_of_10 *= 10;
+    if (xticks == 0) {
+      append_char('0');
     }
-    digits_nums -= 1;
-    pow_of_10 /= 10;
-    while (pow_of_10 > 0) {
-        char next = '0' + xticks / pow_of_10;
-        append_char(next);
-        xticks = xticks % pow_of_10;
-        pow_of_10 /= 10;
+    else {
+      uint digits_nums = 0;
+      uint pow_of_10 = 1;
+      while (pow_of_10 < xticks) {
+          digits_nums += 1;
+          pow_of_10 *= 10;
+      }
+      digits_nums -= 1;
+      pow_of_10 /= 10;
+      while (pow_of_10 > 0) {
+          char next = '0' + xticks / pow_of_10;
+          append_char(next);
+          xticks = xticks % pow_of_10;
+          pow_of_10 /= 10;
+      }
     }
     append_char(' ');
     append_char('t');
