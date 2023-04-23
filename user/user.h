@@ -23,7 +23,7 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int lock(int, int);
-int dmesg(void);
+int dmesg(char*, int);
 
 
 // ulib.c

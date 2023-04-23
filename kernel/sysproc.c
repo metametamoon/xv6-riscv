@@ -173,6 +173,9 @@ uint64 sys_lock(void) {
 
 
 uint64 sys_dmesg(void) {
-  dmesg();
-  return 0;
+  char* buff;
+  argaddr(0, (uint64*) &buff);
+  int max_length;
+  argint(1, &max_length);
+  return dmesg(buff, max_length);
 }

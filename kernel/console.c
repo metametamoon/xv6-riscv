@@ -21,7 +21,6 @@
 #include "riscv.h"
 #include "defs.h"
 #include "proc.h"
-
 #include "pr_msg.h"
 
 #define BACKSPACE 0x100
@@ -241,14 +240,15 @@ void append_ticks() {
     else {
       uint digits_nums = 0;
       uint pow_of_10 = 1;
-      while (pow_of_10 < xticks) {
+      while (pow_of_10 <= xticks) {
           digits_nums += 1;
           pow_of_10 *= 10;
       }
       digits_nums -= 1;
       pow_of_10 /= 10;
       while (pow_of_10 > 0) {
-          char next = '0' + xticks / pow_of_10;
+          int offset = xticks / pow_of_10;
+          char next = '0' + offset;
           append_char(next);
           xticks = xticks % pow_of_10;
           pow_of_10 /= 10;
@@ -355,8 +355,14 @@ void pr_msg(const char *fmt, ...) {
   release(&msg_buffer.lock);
 }
 
-void dmesg() {
-  for (int i = msg_buffer.head; i != msg_buffer.tail; i = (i + 1) % MSG_BUFF_SIZE) {
-      consputc(msg_buffer.buffer[i]);
+int dmesg(char* buff, int max_length) {
+  int counter = 0;
+  for (int i = msg_buffer.head; i != msg_buffer.tail && counter < max_length; i = (i + 1) % MSG_BUFF_SIZE) {
+    ++counter;
+    if (copyout(myproc()->pagetable, (uint64)buff, msg_buffer.buffer + i, sizeof(char)) < 0)
+      return -1;
+    ++buff;
   }
+  pr_msg("Called dmesg with length %d.\n", max_length);
+  return 0;
 }

@@ -5,6 +5,7 @@
 
 
 int main(int argc, char** argv) {
-    dmesg();
+    char buff[128];
+    dmesg(buff, 128);
     return 0;
 }

@@ -1,4 +1,3 @@
-#define MSG_BUFF_SIZE 500
-
+#include "msg_buff_size.h"
 void pr_msg(const char *str, ...);
-void dmesg(void);
+int dmesg(char* buff, int length);
