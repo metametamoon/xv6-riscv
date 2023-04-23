@@ -21,6 +21,7 @@
 #include "riscv.h"
 #include "defs.h"
 #include "proc.h"
+#include "pr_msg.h"
 
 #define BACKSPACE 0x100
 #define C(x)  ((x)-'@')  // Control-x
@@ -189,4 +190,179 @@ consoleinit(void)
   // to consoleread and consolewrite.
   devsw[CONSOLE].read = consoleread;
   devsw[CONSOLE].write = consolewrite;
+}
+
+
+void*
+memmove(void *dst, const void *src, uint n);
+
+
+struct {
+    char buffer[MSG_BUFF_SIZE];
+    struct spinlock lock;
+    // int last_pos
+    int head;
+    int tail;
+} msg_buffer;
+
+void append_char(char ch) {
+  msg_buffer.buffer[msg_buffer.tail] = ch;
+  msg_buffer.tail = (msg_buffer.tail + 1) % MSG_BUFF_SIZE;
+  if (msg_buffer.tail == msg_buffer.head) {
+    msg_buffer.head = (msg_buffer.head + 1) % MSG_BUFF_SIZE;
+    int itercount = 0;
+    while (msg_buffer.buffer[msg_buffer.head] != '\n' && itercount <= MSG_BUFF_SIZE) {
+      msg_buffer.head = (msg_buffer.head + 1) % MSG_BUFF_SIZE;
+      itercount += 1;
+    }
+    if (itercount > MSG_BUFF_SIZE) {
+      // no newlines... push head one position forward
+      msg_buffer.head = (msg_buffer.head + 1) % MSG_BUFF_SIZE;
+    } else  { // msg_buffer.head == '\n'.
+      int new_pos = (msg_buffer.head + 1) % MSG_BUFF_SIZE;
+      if (new_pos != msg_buffer.tail) {
+        msg_buffer.head = new_pos;
+      }
+      // only one \n, right before the  tail; nothing needs to be done
+    }
+  }
+}
+
+void append_ticks() {
+    append_char('[');
+    uint xticks;
+    acquire(&tickslock);
+    xticks = ticks;
+    release(&tickslock);
+    if (xticks == 0) {
+      append_char('0');
+    }
+    else {
+      uint digits_nums = 0;
+      uint pow_of_10 = 1;
+      while (pow_of_10 <= xticks) {
+          digits_nums += 1;
+          pow_of_10 *= 10;
+      }
+      digits_nums -= 1;
+      pow_of_10 /= 10;
+      while (pow_of_10 > 0) {
+          int offset = xticks / pow_of_10;
+          char next = '0' + offset;
+          append_char(next);
+          xticks = xticks % pow_of_10;
+          pow_of_10 /= 10;
+      }
+    }
+    append_char(' ');
+    append_char('t');
+    append_char('k');
+    append_char('s');
+    append_char(']');
+    append_char(' ');
+}
+
+
+
+static char digits[] = "0123456789abcdef";
+
+static void
+printintbuff(int xx, int base, int sign)
+{
+  char buf[16];
+  int i;
+  uint x;
+
+  if(sign && (sign = xx < 0))
+    x = -xx;
+  else
+    x = xx;
+
+  i = 0;
+  do {
+    buf[i++] = digits[x % base];
+  } while((x /= base) != 0);
+
+  if(sign)
+    buf[i++] = '-';
+
+  while(--i >= 0)
+    append_char(buf[i]);
+}
+
+static void
+printptrbuff(uint64 x)
+{
+  int i;
+  append_char('0');
+  append_char('x');
+  for (i = 0; i < (sizeof(uint64) * 2); i++, x <<= 4)
+    append_char(digits[x >> (sizeof(uint64) * 8 - 4)]);
+}
+
+
+
+// The message
+void pr_msg(const char *fmt, ...) {
+  va_list ap;
+  int i, c;
+  char *s;
+
+  acquire(&msg_buffer.lock);
+  append_ticks();
+
+  if (fmt == 0)
+    panic("null fmt");
+
+  va_start(ap, fmt);
+  for(i = 0; (c = fmt[i] & 0xff) != 0; i++){
+    if(c != '%'){
+      append_char(c);
+      continue;
+    }
+    c = fmt[++i] & 0xff;
+    if(c == 0)
+      break;
+    switch(c){
+    case 'd':
+      printintbuff(va_arg(ap, int), 10, 1);
+      break;
+    case 'x':
+      printintbuff(va_arg(ap, int), 16, 1);
+      break;
+    case 'p':
+      printptrbuff(va_arg(ap, uint64));
+      break;
+    case 's':
+      if((s = va_arg(ap, char*)) == 0)
+        s = "(null)";
+      for(; *s; s++)
+        append_char(*s);
+      break;
+    case '%':
+      append_char('%');
+      break;
+    default:
+      // Print unknown % sequence to draw attention.
+      append_char('%');
+      append_char(c);
+      break;
+    }
+  }
+  va_end(ap);
+  append_char('\n');
+
+  release(&msg_buffer.lock);
+}
+
+int dmesg(char* buff, int max_length) {
+  int counter = 0;
+  for (int i = msg_buffer.head; i != msg_buffer.tail && counter < max_length; i = (i + 1) % MSG_BUFF_SIZE) {
+    ++counter;
+    if (copyout(myproc()->pagetable, (uint64)buff, msg_buffer.buffer + i, sizeof(char)) < 0)
+      return -1;
+    ++buff;
+  }
+  pr_msg("Called dmesg with length %d.\n", max_length);
+  return 0;
 }

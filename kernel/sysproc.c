@@ -7,7 +7,7 @@
 #include "proc.h"
 #include "sleeplock.h"
 #include "lock_consts.h"
-
+#include "pr_msg.h"
 
 uint64
 sys_exit(void)
@@ -169,4 +169,13 @@ uint64 sys_lock(void) {
   argint(1, &index);
 
   return syslock(request, index);
+}
+
+
+uint64 sys_dmesg(void) {
+  char* buff;
+  argaddr(0, (uint64*) &buff);
+  int max_length;
+  argint(1, &max_length);
+  return dmesg(buff, max_length);
 }
