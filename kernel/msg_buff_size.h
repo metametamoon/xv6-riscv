@@ -1,1 +1,1 @@
-#define MSG_BUFF_SIZE 500
+#define MSG_BUFF_SIZE 2000

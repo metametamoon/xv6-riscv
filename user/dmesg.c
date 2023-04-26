@@ -8,7 +8,7 @@
 int main(int argc, char** argv) {
     char buff[MSG_BUFF_SIZE];
     dmesg(buff, MSG_BUFF_SIZE - 1);
-    printf(buff);
 
+    write(1, buff, MSG_BUFF_SIZE - 1);
     return 0;
 }

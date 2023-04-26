@@ -231,9 +231,9 @@ void append_char(char ch) {
 void append_ticks() {
     append_char('[');
     uint xticks;
-    acquire(&tickslock);
+    // acquire(&tickslock);
     xticks = ticks;
-    release(&tickslock);
+    // release(&tickslock);
     if (xticks == 0) {
       append_char('0');
     }
@@ -363,6 +363,8 @@ int dmesg(char* buff, int max_length) {
       return -1;
     ++buff;
   }
-  pr_msg("Called dmesg with length %d.\n", max_length);
+  // if (counter == max_length)
+
+  pr_msg("Called dmesg with length %d.", max_length);
   return 0;
 }
