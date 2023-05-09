@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "pr_msg.h": "c",
+        "atomic": "c",
+        "*.tcc": "c",
+        "fstream": "c",
+        "sstream": "c",
+        "cassert": "c",
+        "msg_buff_size.h": "c",
+        "functional": "c",
+        "iostream": "c"
+    }
+}

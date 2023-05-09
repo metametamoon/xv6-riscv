@@ -242,6 +242,16 @@ bad:
   return -1;
 }
 
+uint64
+sys_symlink(void)
+{
+  char source[MAXPATH], destination[MAXPATH];
+
+  if(argstr(0, source, MAXPATH) < 0 || argstr(1, destination, MAXPATH) < 0)
+    return -1;
+    
+}
+
 static struct inode*
 create(char *path, short type, short major, short minor)
 {
