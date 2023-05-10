@@ -242,15 +242,7 @@ bad:
   return -1;
 }
 
-uint64
-sys_symlink(void)
-{
-  char source[MAXPATH], destination[MAXPATH];
 
-  if(argstr(0, source, MAXPATH) < 0 || argstr(1, destination, MAXPATH) < 0)
-    return -1;
-    
-}
 
 static struct inode*
 create(char *path, short type, short major, short minor)
@@ -378,6 +370,42 @@ sys_open(void)
   end_op();
 
   return fd;
+}
+
+uint64
+sys_symlink(void)
+{
+  char source[MAXPATH], destination[MAXPATH];
+
+  if(argstr(0, source, MAXPATH) < 0 || argstr(1, destination, MAXPATH) < 0)
+    return -1;
+
+  begin_op();
+  struct inode* ip = create(source, T_SYMLINK, 0, 0);
+  if (ip == 0) {
+    end_op();
+    printf("File \"%s\" already exists!\n", source);
+    return -1;
+  }
+  int dest_len = strlen(destination);
+  printf("here!\n");
+  printf("\%p\n", ip);
+  // ilock(ip);
+  // printf("locked!\n");
+
+  int r;
+  if ((r = writei(ip, 0, (uint64)destination, 0, dest_len)) == dest_len) {
+    printf("Success!\n");
+    iunlockput(ip);
+    end_op();
+    return 0;
+  } else {
+    printf("Wrote only %d!\n", r);
+  }
+  iunlockput(ip);
+  end_op();
+  return -1;
+    
 }
 
 uint64

@@ -29,6 +29,8 @@ ls(char *path)
   int fd;
   struct dirent de;
   struct stat st;
+  int desc;
+  char source[128];
 
   if((fd = open(path, 0)) < 0){
     fprintf(2, "ls: cannot open %s\n", path);
@@ -45,6 +47,14 @@ ls(char *path)
   case T_DEVICE:
   case T_FILE:
     printf("%s %d %d %l\n", fmtname(path), st.type, st.ino, st.size);
+    break;
+  case T_SYMLINK:
+    desc = open(path, 0);
+    // source[128];
+    read(desc, source, 128);
+    close(desc);
+    
+    printf("%s %d %d %l (symlink to %s)\n", fmtname(path), st.type, st.ino, st.size, source);
     break;
 
   case T_DIR:
