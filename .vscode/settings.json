@@ -8,6 +8,10 @@
         "cassert": "c",
         "msg_buff_size.h": "c",
         "functional": "c",
-        "iostream": "c"
+        "iostream": "c",
+        "iosfwd": "c",
+        "istream": "c",
+        "limits": "c",
+        "streambuf": "c"
     }
 }

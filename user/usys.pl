@@ -39,3 +39,4 @@ entry("uptime");
 entry("lock");
 entry("dmesg");
 entry("symlink");
+entry("readlink");

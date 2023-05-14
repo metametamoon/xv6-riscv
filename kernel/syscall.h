@@ -23,3 +23,4 @@
 #define SYS_lock   22
 #define SYS_dmesg  23
 #define SYS_symlink  24
+#define SYS_readlink  25
