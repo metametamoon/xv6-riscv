@@ -371,18 +371,20 @@ iunlockput(struct inode *ip)
 
 uint read_addr_or_alloc(struct inode* ip, uint blocknum, int offset) {
   struct buf* block  = bread(ip->dev, blocknum);
-  int result = block->data[offset];
+  uint result = ((uint*)block->data)[offset];
   if (result == 0) {
     uint new_block = balloc(ip->dev);
     if (new_block == 0) {
       return 0;
     }
-    block->data[offset] = new_block;
+    ((uint*)block->data)[offset] = new_block;
     result = new_block;
+    log_write(block);
   }
   brelse(block);
   return result;
 }
+
 
 // Inode content
 //
@@ -446,12 +448,15 @@ bmap(struct inode *ip, uint bn)
     // pass through the indirect blocks
     addr = read_addr_or_alloc(ip, indirect, bn / NINDIRECT);
     if (addr == 0) {
+      // printf("bad1\n");
       return -1;
     }
     addr = read_addr_or_alloc(ip, addr, bn % NINDIRECT);
     if (addr == 0) {
+      // printf("bad2\n");
       return -1;
     }
+    // printf("Mapped in double indirect\n");
     return addr;
   }
 
@@ -494,9 +499,9 @@ itrunc(struct inode *ip)
       if(a[j]) {
         struct buf*  in_bp = bread(ip->dev, a[j]); 
         uint* in_a = (uint*)in_bp->data;
-        for(j = 0; j < NINDIRECT; j++){
-          if(in_a[j])
-            bfree(ip->dev, in_a[j]);
+        for(int in_j = 0; in_j < NINDIRECT; in_j++){
+          if(in_a[in_j])
+            bfree(ip->dev, in_a[in_j]);
         }
         brelse(in_bp);
         bfree(ip->dev, a[j]);
