@@ -369,6 +369,21 @@ iunlockput(struct inode *ip)
   iput(ip);
 }
 
+uint read_addr_or_alloc(struct inode* ip, uint blocknum, int offset) {
+  struct buf* block  = bread(ip->dev, blocknum);
+  int result = block->data[offset];
+  if (result == 0) {
+    uint new_block = balloc(ip->dev);
+    if (new_block == 0) {
+      return 0;
+    }
+    block->data[offset] = new_block;
+    result = new_block;
+  }
+  brelse(block);
+  return result;
+}
+
 // Inode content
 //
 // The content (data) associated with each inode is stored
@@ -416,6 +431,29 @@ bmap(struct inode *ip, uint bn)
     brelse(bp);
     return addr;
   }
+  bn -= NINDIRECT;
+  if (bn < NINDIRECT * NINDIRECT) {
+    // check the double indirect block existense
+    uint indirect = ip->addrs[NDIRECT + 1];
+    if (indirect == 0) {
+      indirect = balloc(ip->dev);
+      if (indirect == 0) {
+        panic("bmap: failed balloc");
+        return -1;
+      }
+      ip->addrs[NDIRECT + 1] = indirect;
+    }
+    // pass through the indirect blocks
+    addr = read_addr_or_alloc(ip, indirect, bn / NINDIRECT);
+    if (addr == 0) {
+      return -1;
+    }
+    addr = read_addr_or_alloc(ip, addr, bn % NINDIRECT);
+    if (addr == 0) {
+      return -1;
+    }
+    return addr;
+  }
 
   panic("bmap: out of range");
 }
@@ -446,6 +484,27 @@ itrunc(struct inode *ip)
     brelse(bp);
     bfree(ip->dev, ip->addrs[NDIRECT]);
     ip->addrs[NDIRECT] = 0;
+  }
+
+  // release double indirect block if exists
+  if (ip->addrs[NDIRECT + 1] != 0) {
+    bp = bread(ip->dev, ip->addrs[NDIRECT + 1]);
+    a = (uint*)bp->data;
+    for(j = 0; j < NINDIRECT; j++){
+      if(a[j]) {
+        struct buf*  in_bp = bread(ip->dev, a[j]); 
+        uint* in_a = (uint*)in_bp->data;
+        for(j = 0; j < NINDIRECT; j++){
+          if(in_a[j])
+            bfree(ip->dev, in_a[j]);
+        }
+        brelse(in_bp);
+        bfree(ip->dev, a[j]);
+      }
+    }
+    brelse(bp);
+    bfree(ip->dev, ip->addrs[NDIRECT + 1]);
+    ip->addrs[NDIRECT + 1] = 0;
   }
 
   ip->size = 0;
