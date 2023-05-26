@@ -135,6 +135,7 @@ UPROGS=\
 	$U/_two-channels\
 	$U/_test\
 	$U/_dmesg\
+	$U/_mkfile\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
