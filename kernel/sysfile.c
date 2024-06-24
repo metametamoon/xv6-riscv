@@ -242,6 +242,8 @@ bad:
   return -1;
 }
 
+
+
 static struct inode*
 create(char *path, short type, short major, short minor)
 {
@@ -368,6 +370,68 @@ sys_open(void)
   end_op();
 
   return fd;
+}
+
+uint64
+sys_symlink(void)
+{
+  char source[MAXPATH], destination[MAXPATH];
+
+  if(argstr(0, source, MAXPATH) < 0 || argstr(1, destination, MAXPATH) < 0)
+    return -1;
+
+  begin_op();
+  struct inode* ip = create(source, T_SYMLINK, 0, 0);
+  if (ip == 0) {
+    end_op();
+    printf("File \"%s\" already exists!\n", source);
+    return -1;
+  }
+  int dest_len = strlen(destination);
+
+  int r;
+  if ((r = writei(ip, 0, (uint64)destination, 0, dest_len)) == dest_len) {
+    printf("Success!\n");
+    iunlockput(ip);
+    end_op();
+    return 0;
+  } else {
+    printf("Wrote only %d!\n", r);
+  }
+  iunlockput(ip);
+  end_op();
+  return -1;
+    
+}
+
+uint64
+sys_readlink(void)
+{
+  char linkpath[MAXPATH], buffer[MAXPATH];
+
+  if(argstr(0, linkpath, MAXPATH) < 0 || argstr(1, buffer, MAXPATH) < 0)
+    return -1;
+  
+  begin_op();
+  struct inode* ip = namei(linkpath);
+  if (ip == 0) {
+    end_op();
+    return -1;
+  } else if (ip->type != T_SYMLINK) {
+    iput(ip);
+    end_op();
+    return -1;
+  }
+
+  ilock(ip);
+  int r = readi(ip, 0, (uint64)buffer, 0, ip->size);
+  if (r >= 1) {
+    buffer[r] = '\0';
+  }
+  iunlock(ip);
+  end_op();
+  return r <= 0;
+
 }
 
 uint64
